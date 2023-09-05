@@ -4,14 +4,14 @@ FUNCTION get_access_token RETURN CLOB IS
 
 BEGIN
 
-    IF gv_token IS NULL OR gv_token_expiration < sysdate THEN
+    IF gv_sas_token IS NULL OR gv_sas_token_expiration < sysdate THEN
 
-        gv_token := azure_utils.get_sas_access_token ( gc_connection_string );
-        gv_token_expiration := sysdate + interval '1' hour;
+        gv_sas_token := azure_utils.get_sas_access_token ( gc_connection_string );
+        gv_sas_token_expiration := sysdate + interval '1' hour;
 
     END IF;
 
-    return gv_token;
+    return gv_sas_token;
 
 END;
 
@@ -27,9 +27,9 @@ BEGIN
     azure_utils.set_authorization_header ( v_token );
 
     v_response := apex_web_service.make_rest_request ( p_url => gc_registrations_url,
-                                                        p_http_method => 'GET',
-                                                        p_parm_name => apex_string.string_to_table ( 'api-version' ),
-                                                        p_parm_value => apex_string.string_to_table ( gc_api_version ));
+                                                       p_http_method => 'GET',
+                                                       p_parm_name => apex_string.string_to_table ( 'api-version' ),
+                                                       p_parm_value => apex_string.string_to_table ( gc_api_version ));
 
     return v_response;
 
@@ -44,9 +44,9 @@ PROCEDURE send_notification ( p_payload IN CLOB, p_format IN VARCHAR2, p_tags IN
 
 BEGIN
 
-    set_authorization_header ( v_token );
-    apex_web_service.g_request_headers(2).name := 'Content-Type';
-    apex_web_service.g_request_headers(2).value := 'application/json;charset=utf-8';
+    azure_utils.set_authorization_header ( v_token );
+    azure_utils.set_content_type_header ( 'application/json;charset=utf-8' );
+    
     apex_web_service.g_request_headers(3).name := 'ServiceBusNotification-Format';
     apex_web_service.g_request_headers(3).value := p_format;
 
@@ -56,10 +56,12 @@ BEGIN
     END IF;
 
     v_response := apex_web_service.make_rest_request ( p_url => gc_messages_url,
-                                                        p_http_method => 'POST',
-                                                        p_body => p_payload,
-                                                        p_parm_name => apex_string.string_to_table('api-version:test'),
-                                                        p_parm_value => apex_string.string_to_table(gc_api_version || ':true'));
+                                                       p_http_method => 'POST',
+                                                       p_body => p_payload,
+                                                       p_parm_name => apex_string.string_to_table('api-version:test'),
+                                                       p_parm_value => apex_string.string_to_table(gc_api_version || ':true'));
+
+    dbms_output.put_line (v_response);
 
 END send_notification;
 
